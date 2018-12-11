@@ -1,4 +1,3 @@
-import Control.Monad (when)
 import qualified Data.Text as T
 import Prelude hiding (lex)
 
@@ -8,11 +7,11 @@ import Syntaxer
 testCase :: String -> IO ()
 testCase str = do
   let (lexemes, errs1) = lex $ T.pack str
-      errs2 = syntax lexemes
+      (expr, errs2) = syntax lexemes
       errs = errs1 ++ errs2
   putStrLn ""
   putStrLn str
-  when (null errs) $ putStrLn "No errors"
+  print expr
   mapM_ (putStrLn . T.unpack) errs
 
 main :: IO ()

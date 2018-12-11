@@ -3,10 +3,11 @@ module Syntaxer where
 import Text.Printf (printf)
 import qualified Data.Text as T
 import Data.Text (Text)
+import Data.Maybe (fromMaybe)
 
 import Lexer (Lexeme(..))
 
-data Expr = Expr
+data Expr = EWrong | EConst Double | EVar Text | EOperator Char Expr Expr
   deriving (Show, Eq)
 
 data SyntaxState = SyntaxState 
@@ -15,12 +16,31 @@ data SyntaxState = SyntaxState
   , _errs :: [Text]
   } deriving (Show)
 
-syntax :: [(Lexeme, Int)] -> [Text]
-syntax lexemes = _errs $ head $ dropWhile (not . null . _lexemes) $ iterate nextState
-               $ SyntaxState { _lexemes = lexemes
-                             , _stack = []
-                             , _errs = []
-                             }
+syntax :: [(Lexeme, Int)] -> (Expr, [Text])
+syntax lexemes = (expr, errs)
+  where expr = fromMaybe EWrong $ exprList $ map fst stack
+        (SyntaxState _ stack errs) = head $ dropWhile (not . null . _lexemes) $ iterate nextState
+                                   $ SyntaxState { _lexemes = lexemes
+                                                 , _stack = []
+                                                 , _errs = []
+                                                 }
+
+exprList :: [(Either Lexeme Expr)] -> Maybe Expr
+exprList [] = Nothing
+exprList [x] = eleToE x
+exprList (op2:(Left (LOperator ch)):ops) = do
+  op2' <- eleToE op2
+  op1 <- exprList ops
+  return $ EOperator ch op1 op2'
+exprList _ = Nothing
+
+eleToE :: Either Lexeme Expr -> Maybe Expr
+eleToE = either lToE Just
+
+lToE :: Lexeme -> Maybe Expr
+lToE (LConst d) = Just $ EConst d
+lToE (LVar t) = Just $ EVar t
+lToE _ = Nothing
 
 nextState :: SyntaxState -> SyntaxState
 nextState st@(SyntaxState [] _ _) = st
@@ -31,11 +51,11 @@ nextState st@(SyntaxState lexemes stack errs) = case lexeme of
   LCloseBr -> case break ((== (Left LOpenBr)) . fst) stack of
     (_, []) -> st' { _errs = T.pack (printf "Close bracket without open bracket at position %d" pos) : errs }
     ([], _) -> st' { _errs = T.pack (printf "Close bracket right after open bracket at position %d" pos) : errs }
-    (f:_, _:before) -> case fst f of
-      Right _ -> st'NewStack
-      Left (LOperator ch) -> st'NewStack { _errs = T.pack (printf "Operator '%c' right before close bracket at position %d" ch pos) : errs }
-      Left _ -> st'NewStack
-      where st'NewStack = st' { _stack = (Right Expr, pos) : before }
+    (lxms, _:before) -> case fst $ head lxms of
+      Left (LOperator ch) -> (shrink EWrong) { _errs = T.pack (printf "Operator '%c' right before close bracket at position %d" ch pos) : errs }
+      _ -> maybe ((shrink EWrong) { _errs = T.pack (printf "Internal error, expected expr [op expr]*, lexemes: %s" (show lxms)) : errs })
+                 shrink $ exprList $ map fst lxms
+      where shrink expr = st' { _stack = (Right expr, pos) : before }
   LOperator ch -> case stack of
     [] -> st' { _errs = T.pack (printf "Unexpected operator %c at position %d" ch pos) : errs }
     (Left LOpenBr, _):_ -> st' { _errs = T.pack (printf "Unexpected operator %c at position %d" ch pos) : errs }
