@@ -18,6 +18,17 @@ data SyntaxState = SyntaxState
   , _errs :: [Text]
   } deriving (Show)
 
+invOp :: Operator -> Operator
+invOp Minus = Plus
+invOp Plus = Minus
+invOp Mult = Divide
+invOp Divide = Mult
+
+invOps :: Expr -> Expr
+invOps (ELevel lastExpr oes) = ELevel lastExpr 
+  $ map (\(op, expr) -> (invOp op, expr)) oes
+invOps expr = expr
+
 syntax :: [(Lexeme, Int)] -> (Expr, [Text])
 syntax lexemes = (expr, errs)
   where expr = fromMaybe EWrong $ exprList $ map fst stack
@@ -46,9 +57,12 @@ toExpr ls = do
 exprList :: [(Either Lexeme Expr)] -> Maybe Expr
 exprList eles = do
   (lastExpr, oes) <- toExpr eles
-  return $ ELevel lastExpr
-         $ map (\((op1, expr1):xs) -> (op1, ELevel expr1 xs))
-         $ groupBy (\_ (op2, _) -> op2 `elem` [Mult, Divide]) oes 
+  let grps = groupBy (\_ (op2, _) -> op2 `elem` [Mult, Divide]) oes 
+      fstOp = fst $ head $ head grps
+  return $ if length grps == 1 && fstOp `elem` [Mult, Divide] 
+           then ELevel lastExpr $ head grps
+           else ELevel lastExpr
+              $ map (\((op1, expr1):xs) -> (op1, ELevel expr1 xs)) grps
 
 eleToE :: Either Lexeme Expr -> Maybe Expr
 eleToE = either lToE Just
@@ -78,7 +92,6 @@ nextState st@(SyntaxState lexemes stack errs) = case lexeme of
     (Left (LOperator _), _):_ -> st' { _errs = T.pack (printf "Unexpected operator '%s' at position %d" (show ch) pos) : errs }
     _ -> st''
   _ -> if null stack then st'' else case fst (head stack) of 
-    (Right _) -> st''
     Left LOpenBr -> st''
     Left (LOperator _) -> st''
     _ -> st'' { _errs = T.pack (printf "Unexpected expression at position %d" pos) : errs }
