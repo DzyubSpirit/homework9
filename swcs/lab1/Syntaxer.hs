@@ -9,7 +9,7 @@ import Data.List (groupBy)
 
 import Lexer (Lexeme(..), Operator(..))
 
-data Expr = EWrong | EConst Double | EVar Text | EOperator Operator Expr Expr
+data Expr = EWrong | EConst Double | EVar Text | ELevel Expr [(Operator, Expr)]
   deriving (Show, Eq)
 
 data SyntaxState = SyntaxState 
@@ -46,11 +46,9 @@ toExpr ls = do
 exprList :: [(Either Lexeme Expr)] -> Maybe Expr
 exprList eles = do
   (lastExpr, oes) <- toExpr eles
-  return $ concatOpnds lastExpr
-         $ map (\((op1, expr1):xs) -> (op1, concatOpnds expr1 xs))
+  return $ ELevel lastExpr
+         $ map (\((op1, expr1):xs) -> (op1, ELevel expr1 xs))
          $ groupBy (\_ (op2, _) -> op2 `elem` [Mult, Divide]) oes 
-  where concatOpnds expr1 xs = foldl f expr1 xs
-        f op2 (op, op1) = EOperator op op1 op2 
 
 eleToE :: Either Lexeme Expr -> Maybe Expr
 eleToE = either lToE Just
