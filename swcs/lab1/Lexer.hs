@@ -8,7 +8,9 @@ import Data.Char (isDigit, isAlpha, isSpace)
 
 import Automata
 
-data Lexeme = LOpenBr | LCloseBr | LConst Double | LVar Text | LOperator Char
+data Operator = Plus | Minus | Mult | Divide
+  deriving (Eq)
+data Lexeme = LOpenBr | LCloseBr | LConst Double | LVar Text | LOperator Operator
   deriving (Show, Eq)
 
 data LexerState = LexerState 
@@ -18,13 +20,22 @@ data LexerState = LexerState
   , _errs :: [Text]
   }
 
+instance Show Operator where
+  show Plus = "+"
+  show Minus = "-"
+  show Mult = "*"
+  show Divide = "/"
+
 instance Automata LexerState where
   nextState st@(LexerState str lexemes pos errs)
     | T.null str = st
     | isSpace ch = st'
     | ch == '(' = st' { _lexemes = putLexeme LOpenBr }
     | ch == ')' = st' { _lexemes = putLexeme LCloseBr }
-    | ch `elem` "*/+-" = st' { _lexemes = putLexeme $ LOperator ch }
+    | ch == '+' = st' { _lexemes = putLexeme $ LOperator Plus }
+    | ch == '-' = st' { _lexemes = putLexeme $ LOperator Minus }
+    | ch == '*' = st' { _lexemes = putLexeme $ LOperator Mult }
+    | ch == '/' = st' { _lexemes = putLexeme $ LOperator Divide }
     | isConst ch = extract isConst $ fmap LConst . readEither . T.unpack
     | isAlpha ch = extract isAlpha $ Right . LVar
     | otherwise = st' { _errs = T.pack (printf "Unknown lexem %c at position %d" ch pos) : errs }

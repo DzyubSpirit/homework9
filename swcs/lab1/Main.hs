@@ -9,10 +9,10 @@ testCase str = do
   let (lexemes, errs1) = lex $ T.pack str
       (expr, errs2) = syntax lexemes
       errs = errs1 ++ errs2
-  putStrLn ""
   putStrLn str
   print expr
   mapM_ (putStrLn . T.unpack) errs
+  putStrLn ""
 
 main :: IO ()
 main = mapM_ testCase 
