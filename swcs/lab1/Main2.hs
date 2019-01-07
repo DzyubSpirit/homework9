@@ -12,14 +12,17 @@ testCase str = do
       (expr, errs2) = syntax lexemes
       errs = errs1 ++ errs2
   putStrLn str
-  when (null errs) $ print $ evalExpr expr
+  when (null errs) $ mapM_ (putStrLn . T.unpack) $ pretty $ evalExpr expr
   mapM_ (putStrLn . T.unpack) errs
   putStrLn ""
 
 main :: IO ()
 main = mapM_ testCase 
   [ "1 * 2 * 3 * 4"
+  , "5 + a/b/c/d+m*(r+p*2*x*y) + 6"
+  , "a/b/c/d+m*(r+p*2*x*y)"
   , "1 * 2 * 3 * 4 * 5"
+  , "1 * (2 / 3 * 4)"
   , "1 / 2 / 3 / 4 / 5"
   , "1 - 2 - 3 - 4 - 5 - 6"
   ]
